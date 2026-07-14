@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <link rel="icon" type="image/x-icon" href="images.png">
+
+<meta charset="UTF-8">
+<title>Vacuum It Clean Game</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 0;
+        background: palegreen;
+
+    }
+
+    h1 {
+        margin-top: 24px;
+        color: purple;
+        font-size: 28px;
+    }
+
+    .subtitle {
+        color: gray;
+        font-size: 13px;
+        margin-top: -10px;
+    }
+
+    .controls {
+        background: lightyellow;
+        border: 2px dashed orange;
+        border-radius: 8px;
+        padding: 10px;
+        display: inline-block;
+        margin-bottom: 10px;
+    }
+
+    .controls label {
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    .controls input, .controls select {
+        margin: 4px 6px;
+        padding: 3px;
+    }
+
+    .controls button {
+        background: lime;
+        border: 3px solid green;
+        border-radius: 6px;
+        padding: 8px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 8px;
+    }
+
+    .controls button:hover {
+        background: limegreen;
+    }
+
+    .info {
+        font-size: 20px;
+        color: darkblue;
+        margin: 8px 0;
+    }
+
+    .info span {
+        font-weight: bold;
+        color: red;
+    }
+
+    #gameArea {
+        width: 85%;
+        max-width: 600px;
+        height: 380px;
+        margin: auto;
+        border: 4px solid black;
+        position: relative;
+        background: white;
+        overflow: hidden;
+        border-radius: 4px;
+    }
+
+    #floorCanvas, #dirtCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    #vacuum {
+        position: absolute;
+        pointer-events: none;
+        display: none;
+        z-index: 5;
+    }
+
+    #vacuum .nozzle {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        border-radius: 50%;
+        border: 3px solid rgba(0,0,0,0.45);
+        background: radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.15) 60%, rgba(0,0,0,0.05) 100%);
+        transform: translate(-50%, -50%);
+        box-sizing: border-box;
+    }
+
+    #vacuum .hose {
+        position: absolute;
+        left: 50%;
+        width: 6px;
+        border-radius: 4px;
+        background: #444;
+        transform: translateX(-50%);
+    }
+
+    #vacuum .body {
+        position: absolute;
+        left: 50%;
+        width: 38px;
+        height: 24px;
+        border-radius: 8px;
+        transform: translateX(-50%);
+        box-shadow: 0 0 0 3px rgba(0,0,0,0.3);
+    }
+
+    .end-popup {
+        display: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        border: 4px solid purple;
+        border-radius: 10px;
+        padding: 20px 30px;
+        z-index: 10;
+        text-align: center;
+    }
+
+    .end-popup h2 {
+        color: purple;
+        margin: 0 0 8px;
+        font-size: 22px;
+    }
+
+    .end-popup p {
+        font-size: 18px;
+        margin: 4px 0;
+    }
+
+    .end-popup button {
+        background: cyan;
+        border: 2px solid blue;
+        border-radius: 6px;
+        padding: 6px 16px;
+        font-size: 15px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    .game-msg {
+        font-size: 15px;
+        color: gray;
+        margin-top: 6px;
+    }
+</style>
+</head>
+<body>
+
+<h1>⊹ ⟢: ̗̀⌯ Vacuum It Clean!!!~ ⊹ ⟢: ̗̀⌯</h1>
+<p class="subtitle">made by : (@ebaduk117)</p>
+
+<div class="controls">
+    <label>vacuum color:</label>
+    <input type="color" id="vacColor" value="#3399ff">
+
+    <label>floor color:</label>
+    <input type="color" id="floorColor" value="#e8d9c3">
+
+    <label>mess level:</label>
+    <select id="mess">
+        <option value="light">light mess</option>
+        <option value="medium" selected>medium mess</option>
+        <option value="heavy">heavy mess (satisfying!!)</option>
+    </select>
+
+    <br>
+    <button onclick="startGame()">▶ make it dirty</button>
+</div>
+
+<div class="info">
+    <p>clean: <span id="cleanPct">0</span>% &nbsp;&nbsp; points: <span id="pointsText">0</span></p>
+</div>
+
+<div id="gameArea">
+    <canvas id="floorCanvas"></canvas>
+    <canvas id="dirtCanvas"></canvas>
+    <div id="vacuum">
+        <div class="hose"></div>
+        <div class="body"></div>
+        <div class="nozzle"></div>
+    </div>
+    <div class="end-popup" id="endPopup">
+        <h2>all clean!! ✨</h2>
+        <p>points earned: <strong id="finalPoints">0</strong></p>
+        <p id="ratingMsg"></p>
+        <button onclick="startGame()">mess it up again?</button>
+    </div>
+</div>
+
+<p class="game-msg">Press "make it dirty" then use WASD to drive the vacuum around the board, then u can  hold a stain to slowly suck it up. some stains are tougher and need extra time.</p>
+
+<script>
+    var floorCanvas = document.getElementById("floorCanvas");
+    var dirtCanvas = document.getElementById("dirtCanvas");
+    var floorCtx = floorCanvas.getContext("2d");
+    var dirtCtx = dirtCanvas.getContext("2d");
+    var vacuumEl = document.getElementById("vacuum");
+    var hoseEl = vacuumEl.querySelector(".hose");
+    var bodyEl = vacuumEl.querySelector(".body");
+    var nozzleEl = vacuumEl.querySelector(".nozzle");
+    var gameArea = document.getElementById("gameArea");
+    var endPopup = document.getElementById("endPopup");
+    var cleanPctText = document.getElementById("cleanPct");
+    var pointsText = document.getElementById("pointsText");
+
+    var cellSize = 20;
+    var cols = 0, rows = 0;
+    var grid = [];
+    var totalDirty = 0;
+    var cleanedCount = 0;
+    var points = 0;
+
+    var brushRadius = 22;
+    var gameRunning = false;
+    var vacuumPos = { x: 0, y: 0 };
+    var lastTimestamp = null;
+    var suckRate = 2.2;
+    var moveSpeed = 220;
+    var keys = { w: false, a: false, s: false, d: false };
+
+    var dirtColors = ["#5c4326", "#7a5c33", "#4a3820", "#8c6b3f"];
+    var toughColors = ["#241a0d", "#2e2110", "#1c140a"];
+
+    function resizeCanvases() {
+        var w = gameArea.clientWidth;
+        var h = gameArea.clientHeight;
+        floorCanvas.width = w;
+        floorCanvas.height = h;
+        dirtCanvas.width = w;
+        dirtCanvas.height = h;
+        cols = Math.ceil(w / cellSize);
+        rows = Math.ceil(h / cellSize);
+    }
+
+    function drawFloor() {
+        var w = floorCanvas.width;
+        var h = floorCanvas.height;
+        floorCtx.fillStyle = document.getElementById("floorColor").value;
+        floorCtx.fillRect(0, 0, w, h);
+
+        floorCtx.strokeStyle = "rgba(0,0,0,0.08)";
+        floorCtx.lineWidth = 1;
+        for (var x = 0; x < w; x += 40) {
+            floorCtx.beginPath();
+            floorCtx.moveTo(x, 0);
+            floorCtx.lineTo(x, h);
+            floorCtx.stroke();
+        }
+    }
+
+    function generateGrid() {
+        var mess = document.getElementById("mess").value;
+        var dirtyChance = mess === "light" ? 0.32 : mess === "heavy" ? 0.68 : 0.5;
+
+        grid = [];
+        totalDirty = 0;
+        cleanedCount = 0;
+        points = 0;
+
+        for (var r = 0; r < rows; r++) {
+            var row = [];
+            for (var c = 0; c < cols; c++) {
+                var isDirty = Math.random() < dirtyChance;
+                var isTough = isDirty && Math.random() < 0.22;
+                var maxHits = isTough ? 4 : 1;
+                row.push({
+                    dirty: isDirty,
+                    tough: isTough,
+                    hitsLeft: maxHits,
+                    maxHits: maxHits,
+                    colorIndex: Math.floor(Math.random() * dirtColors.length),
+                    jitterX: (Math.random() - 0.5) * cellSize * 0.4,
+                    jitterY: (Math.random() - 0.5) * cellSize * 0.4,
+                    radiusFactor: 0.55 + Math.random() * 0.35
+                });
+                if (isDirty) totalDirty++;
+            }
+            grid.push(row);
+        }
+    }
+
+    function drawDirt() {
+        var w = dirtCanvas.width;
+        var h = dirtCanvas.height;
+        dirtCtx.clearRect(0, 0, w, h);
+
+        for (var r = 0; r < rows; r++) {
+            for (var c = 0; c < cols; c++) {
+                var cell = grid[r][c];
+                if (!cell.dirty) continue;
+
+                var cx = c * cellSize + cellSize / 2 + cell.jitterX;
+                var cy = r * cellSize + cellSize / 2 + cell.jitterY;
+                var radius = (cellSize / 2) * cell.radiusFactor;
+                var alpha = 0.35 + 0.55 * (cell.hitsLeft / cell.maxHits);
+                var col = cell.tough ? toughColors[cell.colorIndex % toughColors.length] : dirtColors[cell.colorIndex];
+
+                dirtCtx.globalAlpha = alpha;
+                dirtCtx.fillStyle = col;
+                dirtCtx.beginPath();
+                dirtCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+                dirtCtx.fill();
+
+                if (cell.tough) {
+                    dirtCtx.strokeStyle = "rgba(255,80,80,0.5)";
+                    dirtCtx.lineWidth = 1.5;
+                    dirtCtx.beginPath();
+                    dirtCtx.arc(cx, cy, radius * 0.7, 0, Math.PI * 2);
+                    dirtCtx.stroke();
+                }
+            }
+        }
+        dirtCtx.globalAlpha = 1;
+    }
+
+    function onKeyDown(e) {
+        var key = e.key.toLowerCase();
+        if (key in keys) {
+            keys[key] = true;
+            e.preventDefault();
+        }
+    }
+
+    function onKeyUp(e) {
+        var key = e.key.toLowerCase();
+        if (key in keys) {
+            keys[key] = false;
+            e.preventDefault();
+        }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+
+    function updateVacuumVisual() {
+        var diameter = brushRadius * 2;
+        nozzleEl.style.width = diameter + "px";
+        nozzleEl.style.height = diameter + "px";
+        hoseEl.style.height = (brushRadius + 20) + "px";
+        hoseEl.style.top = -(brushRadius + 20) + "px";
+        bodyEl.style.top = -(brushRadius + 34) + "px";
+        bodyEl.style.background = document.getElementById("vacColor").value;
+
+        vacuumEl.style.left = vacuumPos.x + "px";
+        vacuumEl.style.top = vacuumPos.y + "px";
+        vacuumEl.style.transform = "translate(-50%, 0)";
+    }
+
+    function suckAt(pos, dt) {
+        var cMin = Math.max(0, Math.floor((pos.x - brushRadius) / cellSize));
+        var cMax = Math.min(cols - 1, Math.floor((pos.x + brushRadius) / cellSize));
+        var rMin = Math.max(0, Math.floor((pos.y - brushRadius) / cellSize));
+        var rMax = Math.min(rows - 1, Math.floor((pos.y + brushRadius) / cellSize));
+        var changed = false;
+
+        for (var r = rMin; r <= rMax; r++) {
+            for (var c = cMin; c <= cMax; c++) {
+                var cell = grid[r][c];
+                if (!cell.dirty) continue;
+
+                var cx = c * cellSize + cellSize / 2;
+                var cy = r * cellSize + cellSize / 2;
+                var dist = Math.hypot(cx - pos.x, cy - pos.y);
+                if (dist > brushRadius) continue;
+
+                cell.hitsLeft -= suckRate * dt;
+                changed = true;
+
+                if (cell.hitsLeft <= 0) {
+                    cell.dirty = false;
+                    cleanedCount++;
+                    points += cell.tough ? 5 : 1;
+                }
+            }
+        }
+
+        if (changed) {
+            drawDirt();
+            updateStatsUI();
+        }
+
+        if (totalDirty > 0 && cleanedCount >= totalDirty) {
+            endGame();
+        }
+    }
+
+    function updateStatsUI() {
+        var pct = totalDirty > 0 ? Math.round((cleanedCount / totalDirty) * 100) : 100;
+        cleanPctText.textContent = pct;
+        pointsText.textContent = points;
+    }
+
+    function startGame() {
+        resizeCanvases();
+        generateGrid();
+        drawFloor();
+        drawDirt();
+
+        gameRunning = true;
+        endPopup.style.display = "none";
+        vacuumPos = { x: dirtCanvas.width / 2, y: dirtCanvas.height / 2 };
+        vacuumEl.style.display = "block";
+        for (var k in keys) keys[k] = false;
+
+        updateVacuumVisual();
+        updateStatsUI();
+
+        lastTimestamp = null;
+        requestAnimationFrame(loop);
+    }
+
+    function loop(timestamp) {
+        if (!gameRunning) return;
+
+        if (lastTimestamp === null) lastTimestamp = timestamp;
+        var dt = Math.min((timestamp - lastTimestamp) / 1000, 0.05);
+        lastTimestamp = timestamp;
+
+        var dx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+        var dy = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+
+        if (dx !== 0 || dy !== 0) {
+            var len = Math.hypot(dx, dy);
+            var step = moveSpeed * dt;
+            vacuumPos.x += (dx / len) * step;
+            vacuumPos.y += (dy / len) * step;
+
+            vacuumPos.x = Math.max(0, Math.min(dirtCanvas.width, vacuumPos.x));
+            vacuumPos.y = Math.max(0, Math.min(dirtCanvas.height, vacuumPos.y));
+
+            updateVacuumVisual();
+        }
+
+        suckAt(vacuumPos, dt);
+        requestAnimationFrame(loop);
+    }
+
+    function endGame() {
+        gameRunning = false;
+        vacuumEl.style.display = "none";
+
+        var rating;
+        if (points >= 60) rating = "spotless!! amazing job 🏆";
+        else if (points >= 35) rating = "nice and clean!! good job :0";
+        else if (points >= 15) rating = "clean, but took a while lol :l";
+        else rating = "finally clean!! that was a workout :C";
+
+        document.getElementById("finalPoints").textContent = points;
+        document.getElementById("ratingMsg").textContent = rating;
+        endPopup.style.display = "block";
+    }
+
+    window.addEventListener("resize", function() {
+        if (gameRunning) startGame();
+    });
+</script>
+</body>
+</html>
